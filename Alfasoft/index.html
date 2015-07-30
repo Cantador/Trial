@@ -1,0 +1,229 @@
+﻿<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+    <title>Users</title>
+    <script src="http://code.jquery.com/jquery-2.1.4.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/underscore.js/1.8.3/underscore-min.js"></script>
+</head>
+<body>
+    <div>
+        <input id="btnNovo" type="button" value="Novo" />
+        <input id="btnApaga" type="button" value="Apagar" />
+    </div>
+    <table>
+        <tr>
+            <td>
+                <div id="list"></div>
+            </td>
+            <td>
+                <div id="details">
+                    <table>
+                        <tr>
+                            <td>Id</td>
+                            <td>
+                                <input id="txtId" type="text" />
+                            </td>
+                        </tr>
+                        <tr>
+                            <td>Nome</td>
+                            <td>
+                                <input id="txtName" type="text" />
+                            </td>
+                        </tr>
+                        <tr>
+                            <td>Password</td>
+                            <td>
+                                <input id="txtPassword" type="text" />
+                            </td>
+                        </tr>
+                        <tr>
+                            <td colspan="2">
+                                <input id="btnGravar" type="button" value="Gravar" />
+                                <input id="btnApagar" type="button" value="Apagar" />
+                            </td>
+                        </tr>
+                    </table>
+                </div>
+            </td>
+        </tr>
+    </table>
+
+<script>
+    var DADOS = {};
+    var data = {};
+
+    function loadData() {
+        var req = { Rota: 'api/User/GetUsers' };
+
+        var df = $.Deferred();
+        $.when(ajax(req)).done(function (d) {
+            DADOS = d;
+            populateTable();
+            df.resolve();
+        });
+        return df.promise();
+    }
+
+    function populateTable() {
+        var div = $("#list");
+
+        $(div).html('');
+
+        var table = $('<table/>').attr({ 'id': 'tabela' });
+        var tabHeader = '<theader><tr><td>Id</td><td>Nome</td><td>Password</td></tr></theader>';
+
+        $(table).append(tabHeader);
+
+        _.each(DADOS, function (o, i) {
+            var tabRow = '<tr><td>' + o.Id + '</td><td>' + o.Name + '</td><td>' + o.Password + '</td></tr>';
+
+            $(table).append(tabRow);
+        });
+
+        $(div).append($(table));
+    }
+
+    function saveData() {
+        console.log(data);
+
+        var req = {
+            Rota: 'api/User/PostUser',
+            Tipo: 'POST',
+            SendDados: data
+        };
+
+        var df = $.Deferred();
+        $.when(ajax(req)).done(function (d) {
+            console.log(d);
+            df.resolve();
+        });
+        return df.promise();
+    }
+
+    function delData() {
+        console.log(data);
+
+        var req = {
+            Rota: 'api/User/DeleteUser/' + data.Id,
+            Tipo: 'DELETE'
+        };
+
+        var df = $.Deferred();
+        $.when(ajax(req)).done(function (d) {
+            console.log(d);
+            df.resolve();
+        });
+        return df.promise();
+    }
+
+    function ajax (obj){
+        obj.Tipo = obj.Tipo || 'GET';
+        obj.SendDados = JSON.stringify(obj.SendDados) || '';
+        obj.Global = _.has(obj,'Global')? obj.Global: true;
+
+        if (!obj.hasOwnProperty('Rota')) return false;
+        return $.Deferred(function (dfd) {
+            $.ajax({
+                global: obj.Global,
+                url: obj.Rota,
+                type: obj.Tipo,
+                dataType: 'JSON',
+                contentType:"application/json",
+                data : obj.SendDados,
+                success: function (d) {
+                    if (typeof d == 'object' && !('error' in d)) { dfd.resolve(d); }
+                    else dfd.reject();
+                },
+                error: function () { dfd.reject(); }
+            });
+        }).promise();
+    }
+
+    function findById(id) {
+        var found = _.find(DADOS, function (o, i) {
+            return o.Id == id;
+        });
+
+        return { func: !!found, obj: found };
+    }
+
+    function findByName(id) {
+        var found = _.find(DADOS, function (o, i) {
+            return o.Name == id;
+        });
+
+        return { func: !!found, obj: found };
+    }
+
+    $(document).ready(function () {
+        $("#details").hide();
+        loadData();
+    });
+
+    $("#btnNovo").on("click", function () {
+        console.log('novo');
+        $("#btnGravar").show();
+        $("#btnApagar").hide();
+        $("#details").show();
+    });
+
+    $("#btnGravar").on("click", function () {
+        console.log('grava');
+
+        data.Id = $("#txtId").val();
+        data.Name = $("#txtName").val();
+        data.Password = $("#txtPassword").val();
+
+        var _fx = findByName(data.Name)
+        var _found = _fx.func;
+
+        if (!_found) {
+            $.when(saveData()).done(function () {
+                loadData();
+                $("#txtId").val('');
+                $("#txtName").val('');
+                $("#txtPassword").val('');
+                $("#details").hide();
+            });
+        }
+        else{
+            alert('Nome já existente!');
+        }
+    });
+
+    $("#btnApaga").on("click", function () {
+        console.log('elimina');
+        $("#txtId").hide();
+        $("#txtPassword").hide();
+        $("#btnApagar").show();
+        $("#btnGravar").hide();
+        $("#details").show();
+    });
+
+    $("#btnApagar").on("click", function () {
+        console.log('apaga');
+
+        data.Name = $("#txtName").val();
+
+        var _fx = findByName(data.Name)
+        var _found = _fx.func;
+
+        if (_found) {
+            data.Id = _fx.obj.Id;
+            $.when(delData()).done(function () {
+                loadData();
+                $("#txtId").val('');
+                $("#txtName").val('');
+                $("#txtPassword").val('');
+                $("#txtId").show();
+                $("#txtPassword").show();
+                $("#details").hide();
+            });
+        }
+        else {
+            alert('Nome não existente!');
+        }
+    });
+</script>
+</body>
+</html>
